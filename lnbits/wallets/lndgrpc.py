@@ -83,7 +83,11 @@ class LndWallet(Wallet):
         endpoint = getenv("LND_GRPC_ENDPOINT")
         self.endpoint = endpoint[:-1] if endpoint.endswith("/") else endpoint
         self.port = int(getenv("LND_GRPC_PORT"))
-        self.cert_path = getenv("LND_GRPC_CERT") or getenv("LND_CERT")
+        self.cert_data = ""
+        if getenv("LND_GRPC_CERT_DATA"):
+            self.cert_data = getenv("LND_GRPC_CERT_DATA")
+        else:
+            self.cert_path = getenv("LND_GRPC_CERT") or getenv("LND_CERT")
 
         macaroon = (
             getenv("LND_GRPC_MACAROON")
@@ -93,13 +97,17 @@ class LndWallet(Wallet):
             or getenv("LND_INVOICE_MACAROON")
         )
         
-        
         encrypted_macaroon = getenv("LND_GRPC_MACAROON_ENCRYPTED")
         if encrypted_macaroon:
             macaroon = AESCipher(description="macaroon decryption").decrypt(encrypted_macaroon)    
         self.macaroon = load_macaroon(macaroon)
 
-        cert = open(self.cert_path, "rb").read()
+        cert = ""
+        if hasattr(self, "cert_path"):
+            cert = open(self.cert_path, "rb").read()
+        else:
+            cert = bytes(self.cert_data, "utf-8")
+
         creds = grpc.ssl_channel_credentials(cert)
         auth_creds = grpc.metadata_call_credentials(self.metadata_callback)
         composite_creds = grpc.composite_channel_credentials(creds, auth_creds)
